@@ -1,38 +1,38 @@
-from parser import YandexMapsRouteParser
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
-# Пример использования
-if __name__ == "__main__":
-    # Создаем парсер (headless=False чтобы видеть браузер)
-    with YandexMapsRouteParser(headless=False) as parser:
+from parser import YandexMapsParser
+from parser.utils import print_route_summary, save_route_to_file
 
-        # Вариант 1: По координатам
-        result = parser.get_fastest_route(
+
+def main():
+    # Пример 1: Используем requests (быстро, но может сломаться)
+    print("\n" + "=" * 60)
+    print("ЗАПУСК С BACKEND='REQUESTS'")
+    print("=" * 60)
+
+    with YandexMapsParser(backend='requests', timeout=30) as parser:
+        route = parser.get_fastest_route(
             from_point="55.781939,37.864434",  # М-7 Волга
             to_point="55.754025,37.617820",  # Большая Никольская
             mode="auto"
         )
 
-        # Вариант 2: По названиям
-        # result = parser.get_fastest_route(
-        #     from_point="Москва, Кремль",
-        #     to_point="Москва, ВДНХ",
-        #     mode="auto"
-        # )
+        print_route_summary(route)
 
-        # Выводим результат
-        if result and result.get('success'):
-            print("\n" + "=" * 60)
-            print("САМЫЙ БЫСТРЫЙ МАРШРУТ")
-            print("=" * 60)
-            print(f"Тип: {result['type']}")
-            print(f"Длительность: {result['duration_text']} ({result['duration_seconds']} сек)")
-            print(f"Расстояние: {result['distance_km']} км ({result['distance_meters']} м)")
+    # Пример 2: Используем selenium (надежно, но медленнее)
+    print("\n" + "=" * 60)
+    print("ЗАПУСК С BACKEND='SELENIUM'")
+    print("=" * 60)
 
-            if result.get('traffic_minutes'):
-                print(f"С учетом пробок: {result['traffic_minutes']} мин")
+    with YandexMapsParser(backend='selenium', headless=True, timeout=30) as parser:
+        route = parser.get_fastest_route(
+            from_point="Москва, Красная площадь",
+            to_point="Москва, ВДНХ",
+            mode="auto"
+        )
 
-            print("\nМАРШРУТ:")
-            for i, wp in enumerate(result['waypoints']):
-                print(f"  {i + 1}. {wp['name']}")
-        else:
-            print(f"Ошибка: {result.get('error', 'Неизвестная ошибка')}")
+        print_route_summary(route)
+
+if __name__ == "__main__":
+    main()
