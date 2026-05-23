@@ -7,7 +7,6 @@ from homeassistant.const import (
     ATTR_ATTRIBUTION,
     UnitOfLength,
     UnitOfTime,
-    UnitOfSpeed
 )
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
@@ -16,10 +15,11 @@ from homeassistant.helpers.update_coordinator import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity import DeviceInfo
 
 from .const import (
     DOMAIN, CONF_FROM_POINT, CONF_TO_POINT, CONF_MODE, 
-    CONF_UPDATE_INTERVAL
+    CONF_UPDATE_INTERVAL, DEVICE_MANUFACTURER, DEVICE_MODEL
 )
 
 from .parser import YandexMapsParser
@@ -31,13 +31,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
     coordinator = YandexMapsCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
     
-    # Создаем все сенсоры
+    # Создаем все сенсоры устройства
     sensors = [
         YandexMapsDistanceSensor(coordinator, entry),
         YandexMapsDurationSensor(coordinator, entry),
         YandexMapsDurationTextSensor(coordinator, entry),
         YandexMapsTrafficSensor(coordinator, entry),
         YandexMapsRouteTypeSensor(coordinator, entry),
+        YandexMapsStatusSensor(coordinator, entry),
     ]
     
     async_add_entities(sensors, True)
@@ -99,21 +100,27 @@ class YandexMapsCoordinator(DataUpdateCoordinator):
             'type': route.get('type', mode),
             'traffic_minutes': route.get('traffic_minutes'),
             'traffic_seconds': route.get('traffic_seconds'),
-            'coordinates': route.get('coordinates', []),
             'waypoints': route.get('waypoints', []),
-            'from_name': route.get('waypoints', [{}])[0].get('name', from_point) if route.get('waypoints') else from_point,
-            'to_name': route.get('waypoints', [{}])[1].get('name', to_point) if route.get('waypoints') and len(route.get('waypoints', [])) > 1 else to_point,
         }
 
 
 class BaseRouteSensor(CoordinatorEntity, SensorEntity):
-    """Базовый класс для всех сенсоров маршрута."""
+    """Базовый класс для всех сенсоров маршрута с привязкой к устройству."""
     
     def __init__(self, coordinator: YandexMapsCoordinator, entry: ConfigEntry):
         super().__init__(coordinator)
         self.entry = entry
         self._from_point = entry.data[CONF_FROM_POINT]
         self._to_point = entry.data[CONF_TO_POINT]
+        
+        # Привязываем к устройству
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=f"Маршрут: {self._from_point} → {self._to_point}",
+            manufacturer=DEVICE_MANUFACTURER,
+            model=DEVICE_MODEL,
+            sw_version="1.0.0",
+        )
     
     @property
     def extra_state_attributes(self):
@@ -125,11 +132,8 @@ class BaseRouteSensor(CoordinatorEntity, SensorEntity):
             ATTR_ATTRIBUTION: "Yandex Maps",
             "from_point": self._from_point,
             "to_point": self._to_point,
-            "from_name": self.coordinator.data.get('from_name', self._from_point),
-            "to_name": self.coordinator.data.get('to_name', self._to_point),
             "mode": self.entry.data.get(CONF_MODE, 'auto'),
             "last_update": self.coordinator.last_update_success,
-            "success": self.coordinator.data.get('success', False),
         }
 
 
@@ -138,8 +142,8 @@ class YandexMapsDistanceSensor(BaseRouteSensor):
     
     def __init__(self, coordinator: YandexMapsCoordinator, entry: ConfigEntry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{self._from_point} → {self._to_point} Расстояние"
-        self._attr_unique_id = f"yandex_route_distance_{entry.entry_id}"
+        self._attr_name = "Расстояние"
+        self._attr_unique_id = f"{entry.entry_id}_distance"
         self._attr_native_unit_of_measurement = UnitOfLength.KILOMETERS
         self._attr_icon = "mdi:map-marker-distance"
         self._attr_device_class = "distance"
@@ -149,15 +153,6 @@ class YandexMapsDistanceSensor(BaseRouteSensor):
         if self.coordinator.data:
             return round(self.coordinator.data.get('distance_km', 0), 1)
         return None
-    
-    @property
-    def extra_state_attributes(self):
-        attrs = super().extra_state_attributes
-        if self.coordinator.data:
-            attrs.update({
-                "distance_meters": self.coordinator.data.get('distance_meters', 0),
-            })
-        return attrs
 
 
 class YandexMapsDurationSensor(BaseRouteSensor):
@@ -165,8 +160,8 @@ class YandexMapsDurationSensor(BaseRouteSensor):
     
     def __init__(self, coordinator: YandexMapsCoordinator, entry: ConfigEntry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{self._from_point} → {self._to_point} Время в пути"
-        self._attr_unique_id = f"yandex_route_duration_{entry.entry_id}"
+        self._attr_name = "Время в пути"
+        self._attr_unique_id = f"{entry.entry_id}_duration"
         self._attr_native_unit_of_measurement = UnitOfTime.MINUTES
         self._attr_icon = "mdi:clock-outline"
         self._attr_device_class = "duration"
@@ -183,8 +178,8 @@ class YandexMapsDurationTextSensor(BaseRouteSensor):
     
     def __init__(self, coordinator: YandexMapsCoordinator, entry: ConfigEntry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{self._from_point} → {self._to_point} Время (текст)"
-        self._attr_unique_id = f"yandex_route_duration_text_{entry.entry_id}"
+        self._attr_name = "Время (текст)"
+        self._attr_unique_id = f"{entry.entry_id}_duration_text"
         self._attr_icon = "mdi:clock"
     
     @property
@@ -199,8 +194,8 @@ class YandexMapsTrafficSensor(BaseRouteSensor):
     
     def __init__(self, coordinator: YandexMapsCoordinator, entry: ConfigEntry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{self._from_point} → {self._to_point} Время с пробками"
-        self._attr_unique_id = f"yandex_route_traffic_{entry.entry_id}"
+        self._attr_name = "Время с пробками"
+        self._attr_unique_id = f"{entry.entry_id}_traffic"
         self._attr_native_unit_of_measurement = UnitOfTime.MINUTES
         self._attr_icon = "mdi:traffic-light"
     
@@ -221,15 +216,14 @@ class YandexMapsRouteTypeSensor(BaseRouteSensor):
     
     def __init__(self, coordinator: YandexMapsCoordinator, entry: ConfigEntry):
         super().__init__(coordinator, entry)
-        self._attr_name = f"{self._from_point} → {self._to_point} Тип маршрута"
-        self._attr_unique_id = f"yandex_route_type_{entry.entry_id}"
+        self._attr_name = "Тип маршрута"
+        self._attr_unique_id = f"{entry.entry_id}_type"
         self._attr_icon = "mdi:car"
     
     @property
     def native_value(self):
         if self.coordinator.data:
             route_type = self.coordinator.data.get('type', 'unknown')
-            # Преобразуем в читаемый вид
             types = {
                 'auto': 'Автомобиль',
                 'pedestrian': 'Пешком',
@@ -240,3 +234,31 @@ class YandexMapsRouteTypeSensor(BaseRouteSensor):
             }
             return types.get(route_type, route_type)
         return None
+
+
+class YandexMapsStatusSensor(BaseRouteSensor):
+    """Сенсор статуса маршрута."""
+    
+    def __init__(self, coordinator: YandexMapsCoordinator, entry: ConfigEntry):
+        super().__init__(coordinator, entry)
+        self._attr_name = "Статус"
+        self._attr_unique_id = f"{entry.entry_id}_status"
+        self._attr_icon = "mdi:check-circle"
+    
+    @property
+    def native_value(self):
+        if self.coordinator.data:
+            return "Успешно" if self.coordinator.data.get('success') else "Ошибка"
+        return "Нет данных"
+    
+    @property
+    def extra_state_attributes(self):
+        attrs = super().extra_state_attributes
+        if self.coordinator.data:
+            attrs.update({
+                "success": self.coordinator.data.get('success', False),
+                "waypoints": self.coordinator.data.get('waypoints', []),
+                "duration_seconds": self.coordinator.data.get('duration_seconds', 0),
+                "distance_meters": self.coordinator.data.get('distance_meters', 0),
+            })
+        return attrs
