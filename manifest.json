@@ -1,0 +1,14 @@
+{
+  "domain": "yandex_maps_route",
+  "name": "Yandex Maps Route",
+  "version": "1.0.0",
+  "requirements": [
+    "requests>=2.31.0"
+  ],
+  "dependencies": [],
+  "codeowners": ["@stastpoff"],
+  "config_flow": true,
+  "iot_class": "cloud_polling",
+  "documentation": "https://github.com/stastpru/YMaps-parser",
+  "issue_tracker": "https://github.com/stastpru/YMaps-parser/issues"
+}

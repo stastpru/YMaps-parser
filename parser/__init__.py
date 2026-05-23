@@ -2,9 +2,7 @@
 Парсер маршрутов Яндекс.Карт
 """
 from .base import BaseParser
-from .selenium_parser import SeleniumParser
 from .requests_parser import RequestsParser
-from .playwright_parser import PlaywrightParser
 
 
 class YandexMapsParser:
@@ -33,7 +31,7 @@ class YandexMapsParser:
         Инициализация парсера
 
         Args:
-            backend: 'requests', 'selenium', или 'playwright'
+            backend: 'requests'
             **kwargs: параметры для конкретного бэкенда
                 - headless: bool (для selenium/playwright)
                 - timeout: int (таймаут в секундах)
@@ -42,15 +40,7 @@ class YandexMapsParser:
         """
         self.backend_name = backend
         self.kwargs = kwargs
-
-        if backend == 'requests':
-            self._parser = RequestsParser(**kwargs)
-        elif backend == 'selenium':
-            self._parser = SeleniumParser(**kwargs)
-        elif backend == 'playwright':
-            self._parser = PlaywrightParser(**kwargs)
-        else:
-            raise ValueError(f"Unknown backend: {backend}. Available: requests, selenium, playwright")
+        self._parser = RequestsParser(**kwargs)
 
     def build_url(self, from_point, to_point, mode='auto', region=None, city=None):
         """Генерирует URL для маршрута"""

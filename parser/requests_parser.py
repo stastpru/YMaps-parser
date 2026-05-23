@@ -1,7 +1,9 @@
 """Парсер через requests (без браузера)"""
 import requests
+import logging
 from .base import BaseParser
 
+_LOGGER = logging.getLogger(__name__)
 
 class RequestsParser(BaseParser):
     """Парсер маршрутов через прямой HTTP запрос"""
@@ -34,7 +36,7 @@ class RequestsParser(BaseParser):
             dict: Данные маршрута
         """
         url = self.build_url(from_point, to_point, mode, region, city)
-        print(f"Запрос к: {url}")
+        _LOGGER.debug(f"Запрос к: {url}")
 
         try:
             response = self.session.get(url, timeout=self.timeout)
@@ -43,8 +45,10 @@ class RequestsParser(BaseParser):
             result = self._extract_route_from_html(response.text)
 
             if result:
+                _LOGGER.debug(f"Маршрут найден: {result}")
                 return result
             else:
+                _LOGGER.error("Не удалось извлечь данные маршрута из ответа")
                 return {'success': False, 'error': 'Не удалось извлечь данные маршрута'}
 
         except requests.RequestException as e:

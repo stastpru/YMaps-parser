@@ -1,0 +1,12 @@
+update_route:
+  name: Обновить маршрут
+  description: Принудительно обновить данные маршрута
+  fields:
+    entity_id:
+      name: Сенсор
+      description: Сенсор маршрута для обновления
+      required: true
+      selector:
+        entity:
+          domain: sensor
+          integration: yandex_maps_route
